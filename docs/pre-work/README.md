@@ -7,11 +7,11 @@ This workshop uses the [Docker](https://docs.docker.com/) and [Docker Compose](h
 Various parts of this workshop will require the configuration files from the workshop repository. Use the following command to download the whole repository:
 
 ```bash
-git clone https://github.com/kiersten-stokes/presto-hudi-workshop.git
+git clone https://github.com/IBM/presto-hudi-workshop.git
 cd presto-hudi-workshop
 ```
 
-Alternatively, you can [download the repository as a zip file](https://codeload.github.com/kiersten-stokes/presto-hudi-workshop/zip/refs/heads/main), unzip it and change into the `presto-hudi-workshop` main directory.
+Alternatively, you can [download the repository as a zip file](https://codeload.github.com/IBM/presto-hudi-workshop/zip/refs/heads/main), unzip it and change into the `presto-hudi-workshop` main directory.
 
 ## Download the required jars
 
@@ -21,10 +21,10 @@ Download the jars from the command line:
 
 ```bash
 cd src/conf
-curl -LO https://github.com/kiersten-stokes/presto-hudi-workshop/releases/download/0.1.0/jars.tar.gz
+curl -LO https://github.com/IBM/presto-hudi-workshop/releases/download/0.1.0/jars.tar.gz
 tar -xvzf jars.tar.gz && rm jars.tar.gz
 ```
 
 You may need to include `sudo` in the final command depending on the permissions granted in the `src/conf` directory, e.g.: `sudo tar -xvzf jars.tar.gz`.
 
-Alternatively, you can download the zipped jar files [directly from the latest release of the repo](https://github.com/kiersten-stokes/presto-hudi-workshop/releases/tag/0.1.0), unzip the folder, and manually move them into the `src/conf/jars` path.
+Alternatively, you can download the zipped jar files [directly from the latest release of the repo](https://github.com/IBM/presto-hudi-workshop/releases/tag/0.1.0), unzip the folder, and manually move them into the `src/conf/jars` path.
