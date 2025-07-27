@@ -54,7 +54,7 @@ services:
       - presto-network
 
   minio:
-    image: 'minio/minio:latest'
+    image: 'minio/minio'
     hostname: minio
     container_name: minio
     ports:
@@ -100,19 +100,20 @@ services:
       - 4042:4042
       - 4043:4043
     volumes:
+      # config files
       - ./conf/spark-defaults.conf:/opt/spark/conf/spark-defaults.conf:ro
       - ./conf/core-site.xml:/opt/spark/conf/core-site.xml:ro
+      - ./conf/hadoop-metrics2-s3a-file-system.properties:/opt/spark/conf/hadoop-metrics2-s3a-file-system.properties
+      - ./conf/hadoop-metrics2-hbase.properties:/opt/spark/conf/hadoop-metrics2-hbase.properties
+      - ./conf/hudi-defaults.conf:/etc/hudi/conf/hudi-defaults.conf:ro
+      # jars
       - ./conf/jars/aws-java-sdk-1.11.901.jar:/opt/spark/jars/aws-java-sdk-1.11.901.jar
       - ./conf/jars/aws-java-sdk-core-1.11.901.jar:/opt/spark/jars/aws-java-sdk-core-1.11.901.jar
       - ./conf/jars/aws-java-sdk-dynamodb-1.11.901.jar:/opt/spark/jars/aws-java-sdk-dynamodb-1.11.901.jar
-      - ./conf/jars/aws-java-sdk-kms-1.11.901.jar:/opt/spark/jars/aws-java-sdk-s3-1.11.901.jar
       - ./conf/jars/aws-java-sdk-s3-1.11.901.jar:/opt/spark/jars/aws-java-sdk-s3-1.11.901.jar
       - ./conf/jars/hadoop-aws-3.3.1.jar:/opt/spark/jars/hadoop-aws-3.3.1.jar
       - ./conf/jars/httpclient-4.5.13.jar:/opt/spark/jars/httpclient-4.5.13.jar
       - ./conf/jars/hudi-spark3.2-bundle_2.12-0.14.0.jar:/opt/spark/jars/hudi-spark3.2-bundle_2.12-0.14.0.jar
-      - ./conf/hadoop-metrics2-s3a-file-system.properties:/opt/spark/conf/hadoop-metrics2-s3a-file-system.properties
-      - ./conf/hadoop-metrics2-hbase.properties:/opt/spark/conf/hadoop-metrics2-hbase.properties
-      - ./conf/hudi-defaults.conf:/etc/hudi/conf/hudi-defaults.conf:ro
     environment:
       AWS_ACCESS_KEY_ID: minio
       AWS_SECRET_KEY: minio123

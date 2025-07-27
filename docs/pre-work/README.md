@@ -1,25 +1,30 @@
-# Pre-work
+# Prerequisite
 
-This section is broken up into the following steps:
+This workshop uses the [Docker](https://docs.docker.com/) and [Docker Compose](https://docs.docker.com/compose/) CLI tools to set up a Presto cluster, a local REST server on top of a PostgreSQL database, and a MinIO s3 object storage instance. We recommend [Podman](https://podman.io/), which is a rootless - and hence more secure - drop-in replacement for Docker. [Install Podman](https://podman.io/docs/installation) and ensure that `podman` has been successfully `alias`'ed to `docker` in your working environment.
 
-1. [Sign up for IBM Cloud](#1-sign-up-for-ibm-cloud)
-1. [Download or clone the repo](#2-download-or-clone-the-repo)
+## Clone the workshop repository
 
-## 1. Sign up for IBM Cloud
-
-Ensure you have an IBM Cloud ID
-
-![Cloud Sign up](../images/ibm-cloud-sign-up.png)
-
-## 2. Download or clone the repo
-
-Various parts of this workshop will require the attendee to upload files or run scripts that we've stored in the repository. So let's get that done early on, you'll need [`git`](https://git-scm.com) on your laptop to clone the repository directly, or access to [GitHub.com](https://github.com/) to download the zip file.
-
-To Download, go to the [GitHub repo for this workshop](https://github.com/IBM/workshop-template) and download the archived version of the workshop and extract it on your laptop.
-
-Alternately, run the following command:
+Various parts of this workshop will require the configuration files from the workshop repository. Use the following command to download the whole repository:
 
 ```bash
-git clone https://github.com/IBM/workshop-template
-cd workshop-template
+git clone https://github.com/kiersten-stokes/presto-hudi-workshop.git
+cd presto-hudi-workshop
 ```
+
+Alternatively, you can [download the repository as a zip file](https://codeload.github.com/kiersten-stokes/presto-hudi-workshop/zip/refs/heads/main), unzip it and change into the `presto-hudi-workshop` main directory.
+
+## Download the required jars
+
+We need to include some additional jars to the Spark container so that we can take advantage of Hudi and s3 functionality.
+
+Download the jars from the command line:
+
+```bash
+cd src/conf
+curl -LO https://github.com/kiersten-stokes/presto-hudi-workshop/releases/download/0.1.0/jars.tar.gz
+tar -xvzf jars.tar.gz && rm jars.tar.gz
+```
+
+You may need to include `sudo` in the final command depending on the permissions granted in the `src/conf` directory, e.g.: `sudo tar -xvzf jars.tar.gz`.
+
+Alternatively, you can download the zipped jar files [directly from the latest release of the repo](https://github.com/kiersten-stokes/presto-hudi-workshop/releases/tag/0.1.0), unzip the folder, and manually move them into the `src/conf/jars` path.
