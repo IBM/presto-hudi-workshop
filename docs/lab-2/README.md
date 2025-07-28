@@ -9,15 +9,13 @@ This section is comprised of the following steps:
 
 ## 1. Create Hudi tables
 
-Start a Spark shell
+Enter our Spark container and start the `spark-shell`: 
 
 ```sh
 docker exec -it spark /opt/spark/bin/spark-shell
 ```
 
-Wait for it to start up
-
-Enter "paste" mode by typing the following and pressing enter:
+It may take a few moments to initialize before you see the `>scala` prompt, indicating that it is ready to accept commands. Enter "paste" mode by typing the following and pressing enter:
 
 ```sh
 >scala :paste
@@ -76,7 +74,7 @@ def hudiOptions(tableName: String, tableType: String, precombineField: String, p
 
 ```
 
-Press `Ctrl+D` to begin executing the pasted code.
+Make sure you include a newline character at the very end. Press `Ctrl+D` to begin executing the pasted code.
 
 We will complete the same process with our next code block, which will create and populate our data tables with randomly generated data about taxi trips.
 
@@ -94,13 +92,15 @@ data.withColumn("commit_num", lit("update1")).write.format("hudi").
     save(s"$basePath/$morTableName");
 ```
 
-Go to MinIO UI to explore the created file and directory structure. Looks similar right now with subtle differences in the `.hoodie` directory.
+Go to MinIO UI to explore the created file and directory structure, especially in the `.hoodie` directory. This is where `.hoodie` keeps metadata for the `mor_trips_table`. (TODO insert screenshot here)
 
-In a new terminal tab or window, go to Presto CLI to look at the tables and compare queries.
+In a new terminal tab or window, exec into the Presto container and start the Presto CLI to query our table.
 
 ```sh
  docker exec -it coordinator presto-cli
 ```
+
+We first specify that we want to use the Hudi catalog and `default` schema for all queries here on out. Then, execute a `show tables` command:
 
 ```sh
 presto> use hudi.default;
@@ -113,7 +113,7 @@ presto:default> show tables;
 (2 rows)
 ```
 
-Notice how Hudi has implicity created two versions of the MoR table, each provides a different view. But for now, querying them shows the same view since all tables are currently in the same state.
+Notice how Hudi has implicity created two versions of the MoR table - each provides a different view. Right now, querying them shows the same information since we've only just created the table.
 
 ```sh
 presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips_table_rt;
@@ -132,7 +132,7 @@ presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips
 (10 rows)
 ```
 
-Now, let's go back to our spark-shell terminal tab and add more data to our tables using paste mode.
+Now, let's go back to our `spark-shell` terminal tab and add more data to our tables using paste mode.
 
 ```
 val updates = convertToStringList(dataGen.generateUpdates(10))
@@ -145,7 +145,7 @@ updatedData.withColumn("commit_num", lit("update2")).write.format("hudi").
     save(s"$basePath/$morTableName");
 ```
 
-Back to the Presto CLI, we see that the MoR RO and RT tables are starting to look different. The RT table has the freshest data, and the RO table still shows our previous state.
+Now if we query the tables in the Presto CLI, we see that the MoR `RO` ("read-optimized") and `RT` ("real-time") tables are starting to look different. The RT table has the freshest data, and the RO table still shows our previous state.
 
 ```sh
 presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips_table_ro;
@@ -183,9 +183,9 @@ presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips
 (10 rows)
 ```
 
-We can also look in the Minio UI again to see the different files that are created for each table.
+We can also look in the Minio UI again to see the different files that have been created. (TODO insert screenshot)
 
-Let's add data in the spark-shell one more time, this time specifying that we want to compact the MoR table after the second commit.
+Let's add data in the `spark-shell` one more time, this time specifying that we want to compact the MoR table after the second commit. This means that both the changes made in this operation and in the previous "insert" operation will be made "final".
 
 ```
 val moreUpdates = convertToStringList(dataGen.generateUpdates(100))
@@ -200,7 +200,7 @@ moreUpdatedData.withColumn("commit_num", lit("update3")).write.format("hudi").
     save(s"$basePath/$morTableName");
 ```
 
-Now when we query both tables in the Presto CLI, we see that the RO and RT MoR tables are once again in line. Check the Minio UI to see that we've created a compaction commit.
+Now when we query both tables in the Presto CLI, we see that the RO and RT MoR tables are once again in line. Check the Minio UI to see that we've created a compaction commit. (TODO insert screenshot)
 
 ```sh
 presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips_table_ro;
@@ -255,9 +255,14 @@ data.write.format("hudi")
   .save(s"$basePath/$cowTableName")
 ```
 
-We can explore the partition directories in the Minio UI. And query in the Presto CLI.
+We can see the partition directories in the Minio UI. (TODO insert screenshot)
+
+And query in the Presto CLI.
 
 ```
 presto:default> select * from cow_trips_table limit 10;
 ```
 
+Notice that the queries for CoW tables provide extra metadata information by default. 
+
+TODO insert more screenshots/capture output and expand on the CoW table queries a little more.
