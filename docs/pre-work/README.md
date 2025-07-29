@@ -26,3 +26,9 @@ curl -sSL https://github.com/IBM/presto-hudi-workshop/releases/download/0.1.0/ja
 You may need to include `sudo` in the final command depending on the permissions granted in the `src/conf` directory, e.g.: `sudo tar -xvzf jars.tar.gz`.
 
 Alternatively, you can download the zipped jar files [directly from the latest release of the repo](https://github.com/IBM/presto-hudi-workshop/releases/tag/0.1.0), unzip the folder, and manually move them into the `src/conf/jars` path.
+
+## Optional: Join the Presto community
+
+If you are working on this lab and run into issues, you can reach out on the [Presto Slack](https://communityinviter.com/apps/prestodb/prestodb) `#community` channel. We'll do our best to help troubleshoot with you there! Even if you don't need any help with this workshop, we encourage you to join. Slack is the best place to meet other Presto engineers and users.
+
+If you're interested in contributing code or documentation to Presto, we'd love to have you! Start at the [Presto GitHub repo](https://github.com/prestodb/presto).
