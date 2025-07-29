@@ -74,7 +74,7 @@ def hudiOptions(tableName: String, tableType: String, precombineField: String, p
     "hoodie.datasource.hive_sync.table" -> tableName,
   ) ++ partitionField.map(f => Map("hoodie.datasource.write.partitionpath.field" -> f)).getOrElse(Map.empty)
 }
-
+val dataGen = new DataGenerator
 ```
 
 Make sure you include a newline character at the very end. Press `Ctrl+D` to begin executing the pasted code.
@@ -82,7 +82,6 @@ Make sure you include a newline character at the very end. Press `Ctrl+D` to beg
 We will complete the same process with our next code block, which will create and populate our table with randomly generated data about taxi trips. Here we specify that we want the table to be a "Copy on Write" table, but this is not strictly necessary - this is the default table type in Hudi.  Notice that we are including an extra column, `commit_num` that will show us the commit in which any given row was added.
 
 ```scala
-val dataGen = new DataGenerator
 val inserts = convertToStringList(dataGen.generateInserts(50))
 val data = spark.read.json(spark.sparkContext.parallelize(inserts, 2))
 
@@ -95,7 +94,7 @@ data.withColumn("commit_num", lit("update1")).write.format("hudi").
     save(s"$basePath/$tableName");
 ```
 
-efore we go on to query these tables, let's take a look at what files and directories have been created for this table in our s3 storage. Go to MinIO UI (`localhost:9091`) and log in with the username and password that we defined in `docker-compose.yaml` (`minio`/`minio123`). Under the `hudi-tables` path, there should be a single sub-path called `trips_table`. Below is a look at the file structure.
+Before we go on to query these tables, let's take a look at what files and directories have been created for this table in our s3 storage. Go to MinIO UI (`localhost:9091`) and log in with the username and password that we defined in `docker-compose.yaml` (`minio`/`minio123`). Under the `hudi-tables` path, there should be a single sub-path called `trips_table`. Below is a look at the file structure.
 
 ![table directory in s3](../images/table_dirs.png)
 
@@ -128,6 +127,8 @@ As expected, we see a single table here with the name of the table we created in
 ```sh
 presto:default> select * from trips_table limit 10;
 ```
+!!! note
+    Note: Press "q" to exit out out after you see "(END)"
 
 The results (omitted here for space) show more than you may expect to see with a traditional table. The columns prefixed with `_hoodie` are metadata properties that Hudi uses to manage the table state. You can also see the original columns at far right of the table (`begin_lat`, `begin_lon`, `fare`, etc.).
 
@@ -147,12 +148,14 @@ presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare,
  20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-198-207_20250729020557937.parquet | 55.642805813402006 |   0.9727806198646577 |  0.19982748870912004 
 
  (additional rows omitted here...)
- ```
+```
 
 ## 3. Add data to table and query
 
 Now, let's go back to our `spark-shell` terminal tab and add more data to our tables using paste mode. Note that our `commit_num` column value has changed.
 
+!!! note
+    Note: If you exit your spark-shell and have to issue another "docker exec -it spark /opt/spark/bin/spark-shell" to restart it, you need to get into paste mode and reimport all the required packages again as you did above in step 1.
 
 ```
 val updates = convertToStringList(dataGen.generateUpdates(50))
@@ -183,6 +186,14 @@ presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare,
  20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet | 13.166804203104244 |   0.8977861433951416 |  0.12749772853900576 
 
  (additional rows omitted here...)
+ 20250729230015275   | update2    | dd513af1-2291-4fea-a588-06e7c55fec23-0_0-50-53_20250729230015275.parquet |   48.68719058185585 |   0.4795784679677898 |  0.25038172085518196 
+ 20250729230015275   | update2    | dd513af1-2291-4fea-a588-06e7c55fec23-0_0-50-53_20250729230015275.parquet |   75.48568723276352 |  0.15381057911655593 |   0.9767478911589815 
+ 20250729230015275   | update2    | dd513af1-2291-4fea-a588-06e7c55fec23-0_0-50-53_20250729230015275.parquet |   45.81290455568438 |  0.02795404977976812 |    0.712778116485955 
+ 20250729230015275   | update2    | dd513af1-2291-4fea-a588-06e7c55fec23-0_0-50-53_20250729230015275.parquet |  57.516128683731594 |   0.9507437299992999 |    0.651681577874527 
+ 20250729230015275   | update2    | dd513af1-2291-4fea-a588-06e7c55fec23-0_0-50-53_20250729230015275.parquet |    77.6244653745167 |   0.6935649065845402 |  0.49277090579957905 
+ 20250729230015275   | update2    | dd513af1-2291-4fea-a588-06e7c55fec23-0_0-50-53_20250729230015275.parquet | 0.09544772278234914 |   0.6651362795967237 |   0.8866112536048135 
+ 20250729230015275   | update2    | dd513af1-2291-4fea-a588-06e7c55fec23-0_0-50-53_20250729230015275.parquet |   94.61601725825764 |  0.02466985290858581 |     0.53126878881263 
+
 ```
 
 We can see that the values in the `_hoodie_file_name` have changed for the entries from the first commit. This is to be expected, as we created a "Copy on Write" table. We can also look in the Minio UI again to see the different files that have been created. Notice that there is a new data file that holds only the data added in the most recent commit.
