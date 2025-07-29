@@ -24,10 +24,10 @@ The introductory page of the workshop is broken down into the following sections
 |  |  |
 | :--- | :--- |
 | [Introduction](introduction/README.md) | Introduction to the technologies used |
-| [Prerequisite](pre-work/README.md) | Prerequisites for the workshop |
+| [Pre-work](pre-work/README.md) | Prerequisites for the workshop |
 | [Lab 1: Set up an Open Lakehouse](lab-1/README.md) | Set up Presto & Spark clusters, a Hive metastore, and an s3 storage mechanism |
-| [Lab 2: Create Hudi tables in Spark](lab-2/README.md) | Set up a Hudi tables from the spark-shell and explore in MinIO |
-| [Lab 3: Exploring Hudi Tables & Queries](lab-3/README.md) | Explore how to interact with Hudi tables and  |
+| [Lab 2: Create & Query Basic Hudi Tables](lab-2/README.md) | Set up a Hudi tables from the `spark-shell` and explore them in MinIO and Presto |
+| [Lab 3: Explore Hudi Table & Query Types](lab-3/README.md) | Explore how to create and interact with different types of Hudi tables and queries (intermediate-level concepts) |
 
 ## Compatibility
 

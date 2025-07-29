@@ -1,21 +1,25 @@
-# Create and Query Basic Hudi Tables
+# Explore Hudi Table & Query Types
 
-In this section, you will create Hudi tables with Spark.
+In this section, you will create different types of Hudi tables with Spark and query them with Presto.
 
 This section is comprised of the following steps:
 
-- [Create and Query Basic Hudi Tables](#create-and-query-basic-hudi-tables)
-  - [1. Create Hudi tables](#1-create-hudi-tables)
+- [Explore Hudi Table \& Query Types](#explore-hudi-table--query-types)
+  - [1. Create MoR Hudi table](#1-create-mor-hudi-table)
+  - [2. Query MoR table with Presto](#2-query-mor-table-with-presto)
+  - [3. Add data to MoR table and query](#3-add-data-to-mor-table-and-query)
+  - [4. Create CoW Hudi table](#4-create-cow-hudi-table)
+  - [5. Query CoW table with Presto](#5-query-cow-table-with-presto)
 
-## 1. Create Hudi tables
+## 1. Create MoR Hudi table
 
-Enter our Spark container and start the `spark-shell`: 
+In this section we'll explore Hudi Merge-on-Read (MoR) tables. MoR tables store data using file versions with combination of columnar (e.g parquet) + row based (e.g avro) file formats. Updates are logged to delta files & later compacted to produce new versions of columnar files synchronously or asynchronously. Currently, it is not possible to create Hudi tables from Presto, so we will use Spark to create our tables. To do so, we'll enter the Spark container and start the `spark-shell`:
 
 ```sh
 docker exec -it spark /opt/spark/bin/spark-shell
 ```
 
-It may take a few moments to initialize before you see the `>scala` prompt, indicating that it is ready to accept commands. Enter "paste" mode by typing the following and pressing enter:
+It may take a few moments to initialize before you see the `>scala` prompt, indicating that the shell is ready to accept commands. Enter "paste" mode by typing the following and pressing enter:
 
 ```sh
 >scala :paste
@@ -23,7 +27,7 @@ It may take a few moments to initialize before you see the `>scala` prompt, indi
 // Entering paste mode (ctrl-D to finish)
 ```
 
-Copy and paste the below code, which imports required packages, creates a spark session, and defines some variables that we will reference in subsequent code.
+Copy and paste the below code, which imports required packages, creates a Spark session, and defines some variables that we will reference in subsequent code.
 
 ```scala
 import org.apache.spark.sql.{SparkSession, SaveMode}
@@ -76,7 +80,7 @@ def hudiOptions(tableName: String, tableType: String, precombineField: String, p
 
 Make sure you include a newline character at the very end. Press `Ctrl+D` to begin executing the pasted code.
 
-We will complete the same process with our next code block, which will create and populate our data tables with randomly generated data about taxi trips.
+We will complete the same process with our next code block, which will create and populate our MoR table with randomly generated data about taxi trips. Notice that we are including an extra column, `commit_num` that will show us the commit in which any given row was added.
 
 ```scala
 val dataGen = new DataGenerator
@@ -92,9 +96,13 @@ data.withColumn("commit_num", lit("update1")).write.format("hudi").
     save(s"$basePath/$morTableName");
 ```
 
-Go to MinIO UI to explore the created file and directory structure, especially in the `.hoodie` directory. This is where `.hoodie` keeps metadata for the `mor_trips_table`. (TODO insert screenshot here)
+Before we go on to query these tables, let's take a look at what files and directories have been created for this table in our s3 storage. Go to MinIO UI (`localhost:9091`) and log in with the username and password that we defined in `docker-compose.yaml` (`minio`/`minio123`). Under the `hudi-tables` path, there should be a single sub-path called `mor_trips_table`. Click into this path and explore the created files and directory structure, especially those in the `.hoodie` directory. This is where `.hoodie` keeps metadata for the `mor_trips_table`. We can see that there is one set of `deltacommit` files created to keep track of the initial data we've inserted into the table.
 
-In a new terminal tab or window, exec into the Presto container and start the Presto CLI to query our table.
+![MoR metadata directory](../images/mor_dirs.png)
+
+## 2. Query MoR table with Presto
+
+Now let's query these tables with Presto. In a new terminal tab or window, exec into the Presto container and start the Presto CLI to query our table.
 
 ```sh
  docker exec -it coordinator presto-cli
@@ -113,7 +121,7 @@ presto:default> show tables;
 (2 rows)
 ```
 
-Notice how Hudi has implicity created two versions of the MoR table - each provides a different view. Right now, querying them shows the same information since we've only just created the table.
+Notice how Hudi has implicity created two versions of the MoR table - one suffixed with `_ro` for "read-optimized" and one suffixed with `_rt` for "real-time". As expected, each provides a different view. Right now, querying them shows the same information since we've only inserted data into the table once at time of creation. Run the below query on both tables to verify this.
 
 ```sh
 presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips_table_rt;
@@ -132,7 +140,9 @@ presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips
 (10 rows)
 ```
 
-Now, let's go back to our `spark-shell` terminal tab and add more data to our tables using paste mode.
+## 3. Add data to MoR table and query
+
+Now, let's go back to our `spark-shell` terminal tab and add more data to our tables using paste mode. Note that our `commit_num` column value has changed.
 
 ```
 val updates = convertToStringList(dataGen.generateUpdates(10))
@@ -145,7 +155,7 @@ updatedData.withColumn("commit_num", lit("update2")).write.format("hudi").
     save(s"$basePath/$morTableName");
 ```
 
-Now if we query the tables in the Presto CLI, we see that the MoR `RO` ("read-optimized") and `RT` ("real-time") tables are starting to look different. The RT table has the freshest data, and the RO table still shows our previous state.
+Now if we query the tables in the Presto CLI, we see that the MoR `RO` ("read-optimized") and `RT` ("real-time") tables are starting to look different. As you can guess by the names, the RT table has the freshest data, and the RO table still shows our previous state.
 
 ```sh
 presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips_table_ro;
@@ -183,7 +193,9 @@ presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips
 (10 rows)
 ```
 
-We can also look in the Minio UI again to see the different files that have been created. (TODO insert screenshot)
+We can also look in the Minio UI again to see the different files that have been created. Notice in the `.hoodie` path that we have two sets of `deltacommit` files
+
+![MoR table update](../images/mor_dirs2.png)
 
 Let's add data in the `spark-shell` one more time, this time specifying that we want to compact the MoR table after the second commit. This means that both the changes made in this operation and in the previous "insert" operation will be made "final".
 
@@ -200,7 +212,7 @@ moreUpdatedData.withColumn("commit_num", lit("update3")).write.format("hudi").
     save(s"$basePath/$morTableName");
 ```
 
-Now when we query both tables in the Presto CLI, we see that the RO and RT MoR tables are once again in line. Check the Minio UI to see that we've created a compaction commit. (TODO insert screenshot)
+Now when we query both tables in the Presto CLI, we see that the RO and RT MoR tables are once again in line.
 
 ```sh
 presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips_table_ro;
@@ -238,7 +250,13 @@ presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips
 (10 rows)
 ```
 
-Now let's create a COW table with partitions in Spark.
+In the Minio UI, we are able to see a third set of `deltacommit`s as well as the compaction commit.
+
+![MoR compaction](../images/mor_dirs3.png)
+
+## 4. Create CoW Hudi table
+
+In this section we'll explore Hudi Copy-on-Write (CoW) tables. CoW tables store data using exclusively columnar file formats (e.g parquet). Updates version & rewrites the files by performing a synchronous merge during write. Let's create a COW table with partitions in Spark so that we can also see how partitioning changes the directory structure of our tables. From within the `spark-shell` session from the previous sections, enter the following code in paste mode:
 
 ```
 val cowTableName = "cow_trips_table"
@@ -255,14 +273,45 @@ data.write.format("hudi")
   .save(s"$basePath/$cowTableName")
 ```
 
-We can see the partition directories in the Minio UI. (TODO insert screenshot)
+In the MinIO UI, we can see that we now have a new table path - `cow_trips_table` - under `hudi_tables`. When we explore this path more, we can see the partition directories that have been created for this table according to our specified partition path, "country". Within each are the columnar data files that are associated with that partition.
 
-And query in the Presto CLI.
+![CoW table partitions](../images/cow_dirs.png)
+
+Additionally, in the `.hoodie` directory, we can see that there is a single set of `commit` files. Notice how this differs from our MoR table, which creates `deltacommit` files.
+
+## 5. Query CoW table with Presto
+
+From our Presto CLI tab, we can query the new table. First verify that it has synced to the Hive metastore by running a `show tables` command:
 
 ```
-presto:default> select * from cow_trips_table limit 10;
+presto:default> show tables;
+       Table        
+--------------------
+ cow_trips_table    
+ mor_trips_table_ro 
+ mor_trips_table_rt 
+(3 rows)
 ```
 
-Notice that the queries for CoW tables provide extra metadata information by default. 
+We can then run a `select` statement:
 
-TODO insert more screenshots/capture output and expand on the CoW table queries a little more.
+```
+presto:default> select _hoodie_commit_time, _hoodie_partition_path, _hoodie_file_name, uuid, name, age, country from cow_trips_table limit 10;
+ _hoodie_commit_time | _hoodie_partition_path |                             _hoodie_file_name                              |                 uuid                 |   name   | age | country 
+---------------------+------------------------+----------------------------------------------------------------------------+--------------------------------------+----------+-----+---------
+ 20250729001157020   | country=IN             | c74bc599-44e3-43fd-9851-6ed16c7c0b96-0_1-111-120_20250729001157020.parquet | f2a61600-ddcb-4deb-8692-43c6fc3c7460 | user_319 |  49 | IN      
+ 20250729001157020   | country=IN             | c74bc599-44e3-43fd-9851-6ed16c7c0b96-0_1-111-120_20250729001157020.parquet | fd13dca9-daf1-4f61-975e-21c914326347 | user_7   |  31 | IN      
+ 20250729001157020   | country=IN             | c74bc599-44e3-43fd-9851-6ed16c7c0b96-0_1-111-120_20250729001157020.parquet | ebe3334a-cca0-4abe-955d-dd7e9f27cfbd | user_133 |  34 | IN      
+ 20250729001157020   | country=IN             | c74bc599-44e3-43fd-9851-6ed16c7c0b96-0_1-111-120_20250729001157020.parquet | 59fd628a-eebe-436b-852f-6c248249029d | user_160 |  36 | IN      
+ 20250729001157020   | country=IN             | c74bc599-44e3-43fd-9851-6ed16c7c0b96-0_1-111-120_20250729001157020.parquet | a0141e4a-1a23-4e92-8a5f-564d64b205d7 | user_208 |  30 | IN      
+ 20250729001157020   | country=IN             | c74bc599-44e3-43fd-9851-6ed16c7c0b96-0_1-111-120_20250729001157020.parquet | ba89f773-109f-4f8c-aebe-6aa237d39b31 | user_41  |  45 | IN      
+ 20250729001157020   | country=IN             | c74bc599-44e3-43fd-9851-6ed16c7c0b96-0_1-111-120_20250729001157020.parquet | 01e17303-89b7-4ffc-b95f-689018acf730 | user_383 |  37 | IN      
+ 20250729001157020   | country=IN             | c74bc599-44e3-43fd-9851-6ed16c7c0b96-0_1-111-120_20250729001157020.parquet | e67bcdbc-0a57-4800-a9b5-57426eb82112 | user_317 |  56 | IN      
+ 20250729001157020   | country=IN             | c74bc599-44e3-43fd-9851-6ed16c7c0b96-0_1-111-120_20250729001157020.parquet | 0594e246-7b62-4ddb-b442-8759864fa270 | user_39  |  51 | IN      
+ 20250729001157020   | country=IN             | c74bc599-44e3-43fd-9851-6ed16c7c0b96-0_1-111-120_20250729001157020.parquet | fa8d99e4-6100-41a1-b2c1-dec3a1688608 | user_373 |  45 | IN      
+(10 rows)
+```
+
+Notice that you can see the relevant Hudi metadata information for each row of the data. Note: this information is also available for the MoR tables, but we chose to omit it in the previous section for brevity.
+
+From here, you can experiment with adding data to our partitioned CoW table and exploring how the queries and s3 storage files change. You can also explore more advanced queries of the Hudi metadata on the MoR tables.
