@@ -24,7 +24,7 @@ In order to use Hudi with Presto, we have to set up a Hive metastore to sync our
 1. Open a terminal locally and run the following commands to build the Hive metastore image:
 
    ```sh
-   cd src
+   cd src/conf
    docker compose build
    ```
 
