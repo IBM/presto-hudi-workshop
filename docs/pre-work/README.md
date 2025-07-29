@@ -20,9 +20,7 @@ We need to include some additional jars to the Spark container so that we can ta
 Download the jars from the command line:
 
 ```bash
-cd src/conf
-curl -LO https://github.com/IBM/presto-hudi-workshop/releases/download/0.1.0/jars.tar.gz
-tar -xvzf jars.tar.gz && rm jars.tar.gz
+curl -sSL https://github.com/IBM/presto-hudi-workshop/releases/download/0.1.0/jars.tar.gz | tar -zxvf - -C src/conf
 ```
 
 You may need to include `sudo` in the final command depending on the permissions granted in the `src/conf` directory, e.g.: `sudo tar -xvzf jars.tar.gz`.
