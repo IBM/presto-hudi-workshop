@@ -1,21 +1,24 @@
 # Create and Query Basic Hudi Tables
 
-In this section, you will create Hudi tables with Spark.
+In this section, you will create basic Hudi tables with Spark and query them with Presto.
 
 This section is comprised of the following steps:
 
 - [Create and Query Basic Hudi Tables](#create-and-query-basic-hudi-tables)
   - [1. Create Hudi tables](#1-create-hudi-tables)
+  - [2. Query table with Presto](#2-query-table-with-presto)
+  - [3. Add data to table and query](#3-add-data-to-table-and-query)
+    - [Optional shutdown](#optional-shutdown)
 
 ## 1. Create Hudi tables
 
-Enter our Spark container and start the `spark-shell`: 
+In this section we'll explore Hudi tables. Currently, it is not possible to create Hudi tables from Presto, so we will use Spark to create our tables. To do so, we'll enter the Spark container and start the `spark-shell`:
 
 ```sh
 docker exec -it spark /opt/spark/bin/spark-shell
 ```
 
-It may take a few moments to initialize before you see the `>scala` prompt, indicating that it is ready to accept commands. Enter "paste" mode by typing the following and pressing enter:
+It may take a few moments to initialize before you see the `>scala` prompt, indicating that the shell is ready to accept commands. Enter "paste" mode by typing the following and pressing enter:
 
 ```sh
 >scala :paste
@@ -23,7 +26,7 @@ It may take a few moments to initialize before you see the `>scala` prompt, indi
 // Entering paste mode (ctrl-D to finish)
 ```
 
-Copy and paste the below code, which imports required packages, creates a spark session, and defines some variables that we will reference in subsequent code.
+Copy and paste the below code, which imports required packages, creates a Spark session, and defines some variables that we will reference in subsequent code.
 
 ```scala
 import org.apache.spark.sql.{SparkSession, SaveMode}
@@ -76,31 +79,39 @@ def hudiOptions(tableName: String, tableType: String, precombineField: String, p
 
 Make sure you include a newline character at the very end. Press `Ctrl+D` to begin executing the pasted code.
 
-We will complete the same process with our next code block, which will create and populate our data tables with randomly generated data about taxi trips.
+We will complete the same process with our next code block, which will create and populate our table with randomly generated data about taxi trips. Here we specify that we want the table to be a "Copy on Write" table, but this is not strictly necessary - this is the default table type in Hudi.  Notice that we are including an extra column, `commit_num` that will show us the commit in which any given row was added.
 
 ```scala
 val dataGen = new DataGenerator
-val inserts = convertToStringList(dataGen.generateInserts(10))
+val inserts = convertToStringList(dataGen.generateInserts(50))
 val data = spark.read.json(spark.sparkContext.parallelize(inserts, 2))
 
-val morTableName = "mor_trips_table"
+val tableName = "trips_table"
 
 data.withColumn("commit_num", lit("update1")).write.format("hudi").
     options(getQuickstartWriteConfigs).
-    options(hudiOptions(morTableName, "MERGE_ON_READ", "ts")).
+    options(hudiOptions(tableName, "COPY_ON_WRITE", "ts")).
     mode(Overwrite).
-    save(s"$basePath/$morTableName");
+    save(s"$basePath/$tableName");
 ```
 
-Go to MinIO UI to explore the created file and directory structure, especially in the `.hoodie` directory. This is where `.hoodie` keeps metadata for the `mor_trips_table`. (TODO insert screenshot here)
+efore we go on to query these tables, let's take a look at what files and directories have been created for this table in our s3 storage. Go to MinIO UI (`localhost:9091`) and log in with the username and password that we defined in `docker-compose.yaml` (`minio`/`minio123`). Under the `hudi-tables` path, there should be a single sub-path called `trips_table`. Below is a look at the file structure.
 
-In a new terminal tab or window, exec into the Presto container and start the Presto CLI to query our table.
+![table directory in s3](../images/table_dirs.png)
+
+We have one parquet data file, a Hudi-specific metadata file, and another sub-path, `.hoodie`. The latter is where Hudi keeps most of the metadata for the `trips_table`, including the commit history. We can see that there is one set of `commit` files created to keep track of the initial data we've inserted into the table. Feel free to explore these files further.
+
+![hoodie directory](../images/hoodie_dir.png)
+
+## 2. Query table with Presto
+
+Now let's query this table with Presto. In a new terminal tab or window, exec into the Presto container and start the Presto CLI to query our table.
 
 ```sh
  docker exec -it coordinator presto-cli
 ```
 
-We first specify that we want to use the Hudi catalog and `default` schema for all queries here on out. Then, execute a `show tables` command:
+We first specify that we want to use the Hudi catalog and `default` schema for all queries here on out. The 'default' schema has been implicitly created for us in Presto because it already exists in the Hive metastore. Then, execute a `show tables` command:
 
 ```sh
 presto> use hudi.default;
@@ -108,161 +119,84 @@ USE
 presto:default> show tables;
        Table        
 --------------------
- mor_trips_table_ro 
- mor_trips_table_rt 
-(2 rows)
+ trips_table        
+(1 row)
 ```
 
-Notice how Hudi has implicity created two versions of the MoR table - each provides a different view. Right now, querying them shows the same information since we've only just created the table.
+As expected, we see a single table here with the name of the table we created in the `spark-shell`. We can run a `select *` on this data.
 
 ```sh
-presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips_table_rt;
- commit_num |        fare        |      begin_lon      |      begin_lat      |      ts       
-------------+--------------------+---------------------+---------------------+---------------
- update1    |  93.56018115236618 | 0.14285051259466197 | 0.21624150367601136 | 1753612150659 
- update1    |  27.79478688582596 |  0.6273212202489661 | 0.11488393157088261 | 1753220168185 
- update1    |  66.62084366450246 | 0.03844104444445928 |  0.0750588760043035 | 1753592423892 
- update1    | 34.158284716382845 | 0.46157858450465483 |  0.4726905879569653 | 1753164447671 
- update1    |  64.27696295884016 |  0.4923479652912024 |  0.5731835407930634 | 1753509890278 
- update1    |  41.06290929046368 |  0.8192868687714224 |   0.651058505660742 | 1753209120536 
- update1    | 17.851135255091155 |  0.5644092139040959 |    0.40613510977307 | 1753058046638 
- update1    |  33.92216483948643 |  0.9694586417848392 |  0.1856488085068272 | 1753301302307 
- update1    | 19.179139106643607 |  0.7528268153249502 |  0.8742041526408587 | 1753125594865 
- update1    |   43.4923811219014 |  0.8779402295427752 |  0.6100070562136587 | 1753163044342 
-(10 rows)
+presto:default> select * from trips_table limit 10;
 ```
 
-Now, let's go back to our `spark-shell` terminal tab and add more data to our tables using paste mode.
+The results (omitted here for space) show more than you may expect to see with a traditional table. The columns prefixed with `_hoodie` are metadata properties that Hudi uses to manage the table state. You can also see the original columns at far right of the table (`begin_lat`, `begin_lon`, `fare`, etc.).
+
+Let's execute a query that pares down these results slightly:
+
+```sh
+presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from trips_table order by _hoodie_commit_time;
+ _hoodie_commit_time | commit_num |                             _hoodie_file_name                              |        fare        |      begin_lon       |      begin_lat       
+---------------------+------------+----------------------------------------------------------------------------+--------------------+----------------------+----------------------
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-198-207_20250729020557937.parquet |  5.064924039635443 |   0.3329328066900805 |  0.05829265790920446 
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-198-207_20250729020557937.parquet |  84.00133794186554 |   0.7041966710545763 |   0.3988839560181455 
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-198-207_20250729020557937.parquet |  26.57512568578202 |   0.4130226064649045 |  0.14944324629969385 
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-198-207_20250729020557937.parquet |  61.44682955106423 |  0.13477337728703764 | 0.025339371609693573 
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-198-207_20250729020557937.parquet | 47.886740443749254 |  0.48671796674575485 |   0.6158099753827585 
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-198-207_20250729020557937.parquet |  74.20408022629255 |   0.8293284066906385 |  0.10155019269585785 
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-198-207_20250729020557937.parquet | 43.160518375539205 |   0.8898173709112844 |   0.9937697164202349 
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-198-207_20250729020557937.parquet | 55.642805813402006 |   0.9727806198646577 |  0.19982748870912004 
+
+ (additional rows omitted here...)
+ ```
+
+## 3. Add data to table and query
+
+Now, let's go back to our `spark-shell` terminal tab and add more data to our tables using paste mode. Note that our `commit_num` column value has changed.
+
 
 ```
-val updates = convertToStringList(dataGen.generateUpdates(10))
+val updates = convertToStringList(dataGen.generateUpdates(50))
 val updatedData = spark.read.json(spark.sparkContext.parallelize(updates, 2));
 
 updatedData.withColumn("commit_num", lit("update2")).write.format("hudi").
     options(getQuickstartWriteConfigs).
-    options(hudiOptions(morTableName, "MERGE_ON_READ", "ts")).
+    options(hudiOptions(tableName, "COPY_ON_WRITE", "ts")).
     mode(Append).
-    save(s"$basePath/$morTableName");
+    save(s"$basePath/$tableName");
 ```
 
-Now if we query the tables in the Presto CLI, we see that the MoR `RO` ("read-optimized") and `RT` ("real-time") tables are starting to look different. The RT table has the freshest data, and the RO table still shows our previous state.
+Now if we query the tables in the Presto CLI, we see that there are multiple commit times, as shown by our first two columns in the below query. Make sure to hold `Return` in order to see all 100 rows of the updated table.
 
 ```sh
-presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips_table_ro;
- commit_num |        fare        |      begin_lon      |      begin_lat      |      ts       
-------------+--------------------+---------------------+---------------------+---------------
- update1    |  93.56018115236618 | 0.14285051259466197 | 0.21624150367601136 | 1753612150659 
- update1    |  27.79478688582596 |  0.6273212202489661 | 0.11488393157088261 | 1753220168185 
- update1    |  66.62084366450246 | 0.03844104444445928 |  0.0750588760043035 | 1753592423892 
- update1    | 34.158284716382845 | 0.46157858450465483 |  0.4726905879569653 | 1753164447671 
- update1    |  64.27696295884016 |  0.4923479652912024 |  0.5731835407930634 | 1753509890278 
- update1    |  41.06290929046368 |  0.8192868687714224 |   0.651058505660742 | 1753209120536 
- update1    | 17.851135255091155 |  0.5644092139040959 |    0.40613510977307 | 1753058046638 
- update1    |  33.92216483948643 |  0.9694586417848392 |  0.1856488085068272 | 1753301302307 
- update1    | 19.179139106643607 |  0.7528268153249502 |  0.8742041526408587 | 1753125594865 
- update1    |   43.4923811219014 |  0.8779402295427752 |  0.6100070562136587 | 1753163044342 
-(10 rows)
+presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from trips_table order by _hoodie_commit_time;
+ _hoodie_commit_time | commit_num |                             _hoodie_file_name                              |        fare        |      begin_lon       |      begin_lat       
+---------------------+------------+----------------------------------------------------------------------------+--------------------+----------------------+----------------------
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet | 25.200733895704396 |   0.9805032518130713 |   0.3250925842689032 
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet |  80.22532741048674 |  0.23558979258614088 |   0.9106955060439053 
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet |  84.00133794186554 |   0.7041966710545763 |   0.3988839560181455 
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet | 27.793208764156986 |   0.9676738239915396 |   0.5075033998567434 
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet |  61.44682955106423 |  0.13477337728703764 | 0.025339371609693573 
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet |  90.97255481383131 |   0.7196037664723752 |   0.9539455886006297 
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet |  51.61325440476856 |  0.36749492639453507 |   0.7666637026082733 
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet | 49.732991851283806 |    0.154807828660673 |   0.2276038992283157 
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet |  61.94955367333943 |   0.8474997543537904 |   0.6616963793198591 
+ 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet | 13.166804203104244 |   0.8977861433951416 |  0.12749772853900576 
 
-Query 20250727_223116_00003_h4y8p, FINISHED, 1 node
-Splits: 17 total, 17 done (100.00%)
-[Latency: client-side: 341ms, server-side: 317ms] [10 rows, 426KB] [31 rows/s, 1.31MB/s]
-
-presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips_table_rt;
- commit_num |        fare        |      begin_lon       |      begin_lat      |      ts       
-------------+--------------------+----------------------+---------------------+---------------
- update1    |  93.56018115236618 |  0.14285051259466197 | 0.21624150367601136 | 1753612150659 
- update2    |   98.3428192817987 |   0.3349917833248327 |  0.4777395067707303 | 1753070771758 
- update2    |  63.72504913279929 |    0.888493603696927 |  0.6570857443423376 | 1753304138915 
- update2    |  29.47661370147079 | 0.010872312870502165 |  0.1593867607188556 | 1753577100603 
- update2    | 49.527694252432056 |   0.5142184937933181 |  0.7340133901254792 | 1753517338281 
- update2    |  9.384124531808036 |   0.6999655248704163 | 0.16603428449020086 | 1753523629384 
- update2    |  90.25710109008239 |   0.4006983139989222 | 0.08528650347654165 | 1753458728013 
- update2    |   90.9053809533154 |  0.19949323322922063 | 0.18294079059016366 | 1753653631225 
- update1    | 19.179139106643607 |   0.7528268153249502 |  0.8742041526408587 | 1753125594865 
- update1    |   43.4923811219014 |   0.8779402295427752 |  0.6100070562136587 | 1753163044342 
-(10 rows)
+ (additional rows omitted here...)
 ```
 
-We can also look in the Minio UI again to see the different files that have been created. (TODO insert screenshot)
+We can see that the values in the `_hoodie_file_name` have changed for the entries from the first commit. This is to be expected, as we created a "Copy on Write" table. We can also look in the Minio UI again to see the different files that have been created. Notice that there is a new data file that holds only the data added in the most recent commit.
 
-Let's add data in the `spark-shell` one more time, this time specifying that we want to compact the MoR table after the second commit. This means that both the changes made in this operation and in the previous "insert" operation will be made "final".
+![updated table data files](../images/table_dirs2.png)
 
-```
-val moreUpdates = convertToStringList(dataGen.generateUpdates(100))
-val moreUpdatedData = spark.read.json(spark.sparkContext.parallelize(moreUpdates, 2));
+At this point, feel free to continue executing queries and adding data as desired to get familiar with Hudi functionality. You may also move on to lab 3.
 
-moreUpdatedData.withColumn("commit_num", lit("update3")).write.format("hudi").
-    options(getQuickstartWriteConfigs).
-    options(hudiOptions(morTableName, "MERGE_ON_READ", "ts")).
-    option("hoodie.compact.inline", "true").
-    option("hoodie.compact.inline.max.delta.commits", "2").
-    mode(Append).
-    save(s"$basePath/$morTableName");
-```
+### Optional shutdown
 
-Now when we query both tables in the Presto CLI, we see that the RO and RT MoR tables are once again in line. Check the Minio UI to see that we've created a compaction commit. (TODO insert screenshot)
+If you do not intend to go on to lab 3 right now, you can shut down your lakehouse cluster with the following command:
 
 ```sh
-presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips_table_ro;
- commit_num |        fare        |      begin_lon      |      begin_lat      |      ts       
-------------+--------------------+---------------------+---------------------+---------------
- update3    | 26.636532270940915 | 0.12314538318119372 | 0.35527775182006427 | 1753628123984 
- update3    |  78.85334532337876 | 0.06330332057511467 | 0.16098476392187366 | 1753568217921 
- update3    |  58.09499619051147 | 0.49899171213436844 |  0.9692506010574379 | 1753614222174 
- update2    |   90.9053809533154 | 0.19949323322922063 | 0.18294079059016366 | 1753653631225 
- update3    | 53.682142277927525 |  0.9635314017496284 | 0.16258177392270334 | 1753560939974 
- update3    |  86.98901645001811 |  0.2853709038726113 |  0.9180654821797201 | 1753598176693 
- update3    |  84.14360533180016 | 0.18969854255968877 | 0.30523673273999896 | 1753635483683 
- update3    | 44.596839246210095 | 0.38697902072535484 |  0.9045189017781902 | 1753620381238 
- update3    | 14.824941686410531 |  0.9596221628238303 |  0.9983185001324134 | 1753638430900 
- update3    |  71.08018349571618 |  0.8150991077375751 | 0.01925237918893319 | 1753655212524 
-(10 rows)
-
-Query 20250727_223417_00005_h4y8p, FINISHED, 1 node
-Splits: 17 total, 17 done (100.00%)
-[Latency: client-side: 287ms, server-side: 269ms] [10 rows, 426KB] [37 rows/s, 1.55MB/s]
-
-presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips_table_rt;
- commit_num |        fare        |      begin_lon      |      begin_lat      |      ts       
-------------+--------------------+---------------------+---------------------+---------------
- update3    | 26.636532270940915 | 0.12314538318119372 | 0.35527775182006427 | 1753628123984 
- update3    |  78.85334532337876 | 0.06330332057511467 | 0.16098476392187366 | 1753568217921 
- update3    |  58.09499619051147 | 0.49899171213436844 |  0.9692506010574379 | 1753614222174 
- update3    |  84.14360533180016 | 0.18969854255968877 | 0.30523673273999896 | 1753635483683 
- update3    | 44.596839246210095 | 0.38697902072535484 |  0.9045189017781902 | 1753620381238 
- update3    | 14.824941686410531 |  0.9596221628238303 |  0.9983185001324134 | 1753638430900 
- update3    |  71.08018349571618 |  0.8150991077375751 | 0.01925237918893319 | 1753655212524 
- update2    |   90.9053809533154 | 0.19949323322922063 | 0.18294079059016366 | 1753653631225 
- update3    | 53.682142277927525 |  0.9635314017496284 | 0.16258177392270334 | 1753560939974 
- update3    |  86.98901645001811 |  0.2853709038726113 |  0.9180654821797201 | 1753598176693 
-(10 rows)
+docker compose down -v
 ```
 
-Now let's create a COW table with partitions in Spark.
-
-```
-val cowTableName = "cow_trips_table"
-
-val countries = Seq("US", "IN", "DE")
-val data = (1 to 500).map { i =>
-  (UUID.randomUUID().toString(), s"user_$i", 20 + Random.nextInt(40), countries(Random.nextInt(countries.length)))
-}.toDF("uuid", "name", "age", "country")
-
-data.write.format("hudi")
-  .options(getQuickstartWriteConfigs)
-  .options(hudiOptions(cowTableName, "COPY_ON_WRITE", "age", Some("country")))
-  .mode(Overwrite)
-  .save(s"$basePath/$cowTableName")
-```
-
-We can see the partition directories in the Minio UI. (TODO insert screenshot)
-
-And query in the Presto CLI.
-
-```
-presto:default> select * from cow_trips_table limit 10;
-```
-
-Notice that the queries for CoW tables provide extra metadata information by default. 
-
-TODO insert more screenshots/capture output and expand on the CoW table queries a little more.
+This command will stop all containers and remove the volumes. You can omit the -v command if you want to keep your existing data for the `trips_table` in your Minio storage and come back to complete lab 3 later.

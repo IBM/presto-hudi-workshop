@@ -11,6 +11,12 @@ This section is comprised of the following steps:
   - [4. Create CoW Hudi table](#4-create-cow-hudi-table)
   - [5. Query CoW table with Presto](#5-query-cow-table-with-presto)
 
+If you previously stopped your lakehouse containers, restart them now with:
+
+```sh
+docker compose up -d
+```
+
 ## 1. Create MoR Hudi table
 
 In this section we'll explore Hudi Merge-on-Read (MoR) tables. MoR tables store data using file versions with combination of columnar (e.g parquet) + row based (e.g avro) file formats. Updates are logged to delta files & later compacted to produce new versions of columnar files synchronously or asynchronously. Currently, it is not possible to create Hudi tables from Presto, so we will use Spark to create our tables. To do so, we'll enter the Spark container and start the `spark-shell`:
@@ -28,6 +34,9 @@ It may take a few moments to initialize before you see the `>scala` prompt, indi
 ```
 
 Copy and paste the below code, which imports required packages, creates a Spark session, and defines some variables that we will reference in subsequent code.
+
+!!! note
+    Note: you do not need to copy/paste the below code if you completed lab 2 and have not restarted your `spark-shell`, but, regardless, doing so should be harmless.
 
 ```scala
 import org.apache.spark.sql.{SparkSession, SaveMode}
@@ -96,7 +105,7 @@ data.withColumn("commit_num", lit("update1")).write.format("hudi").
     save(s"$basePath/$morTableName");
 ```
 
-Before we go on to query these tables, let's take a look at what files and directories have been created for this table in our s3 storage. Go to MinIO UI (`localhost:9091`) and log in with the username and password that we defined in `docker-compose.yaml` (`minio`/`minio123`). Under the `hudi-tables` path, there should be a single sub-path called `mor_trips_table`. Click into this path and explore the created files and directory structure, especially those in the `.hoodie` directory. This is where `.hoodie` keeps metadata for the `mor_trips_table`. We can see that there is one set of `deltacommit` files created to keep track of the initial data we've inserted into the table.
+Before we go on to query these tables, let's take a look at what files and directories have been created for this table in our s3 storage. Go to MinIO UI (`localhost:9091`) and log in with the username and password that we defined in `docker-compose.yaml` (`minio`/`minio123`). Under the `hudi-tables` path, there should be a sub-path called `mor_trips_table`. Click into this path and explore the created files and directory structure, especially those in the `.hoodie` directory. This is where Hudi keeps metadata for the `mor_trips_table`. We can see that there is one set of `deltacommit` files created to keep track of the initial data we've inserted into the table.
 
 ![MoR metadata directory](../images/mor_dirs.png)
 
@@ -121,22 +130,25 @@ presto:default> show tables;
 (2 rows)
 ```
 
+!!! note
+    You may have an additional table if you completed lab 2 without shutting down or restarting your lakehouse cluster.
+
 Notice how Hudi has implicity created two versions of the MoR table - one suffixed with `_ro` for "read-optimized" and one suffixed with `_rt` for "real-time". As expected, each provides a different view. Right now, querying them shows the same information since we've only inserted data into the table once at time of creation. Run the below query on both tables to verify this.
 
 ```sh
-presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips_table_rt;
- commit_num |        fare        |      begin_lon      |      begin_lat      |      ts       
-------------+--------------------+---------------------+---------------------+---------------
- update1    |  93.56018115236618 | 0.14285051259466197 | 0.21624150367601136 | 1753612150659 
- update1    |  27.79478688582596 |  0.6273212202489661 | 0.11488393157088261 | 1753220168185 
- update1    |  66.62084366450246 | 0.03844104444445928 |  0.0750588760043035 | 1753592423892 
- update1    | 34.158284716382845 | 0.46157858450465483 |  0.4726905879569653 | 1753164447671 
- update1    |  64.27696295884016 |  0.4923479652912024 |  0.5731835407930634 | 1753509890278 
- update1    |  41.06290929046368 |  0.8192868687714224 |   0.651058505660742 | 1753209120536 
- update1    | 17.851135255091155 |  0.5644092139040959 |    0.40613510977307 | 1753058046638 
- update1    |  33.92216483948643 |  0.9694586417848392 |  0.1856488085068272 | 1753301302307 
- update1    | 19.179139106643607 |  0.7528268153249502 |  0.8742041526408587 | 1753125594865 
- update1    |   43.4923811219014 |  0.8779402295427752 |  0.6100070562136587 | 1753163044342 
+presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_ro order by _hoodie_commit_time;
+ _hoodie_commit_time | commit_num |                             _hoodie_file_name                              |        fare        |      begin_lon      |      begin_lat      
+---------------------+------------+----------------------------------------------------------------------------+--------------------+---------------------+---------------------
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  60.34776367964548 | 0.04838041157380535 |  0.8043080489965999 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |     77.87647707179 | 0.48628479602261987 |  0.5108935227213224 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  92.66658188648728 | 0.19250097971954727 | 0.29883236260196766 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  87.60866855274442 |  0.7072482413115851 |  0.4050368427403227 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  2.542602090419077 | 0.32513116973946665 |  0.5223409231279434 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  64.50549995709942 |   0.644801818366808 | 0.27416484281668874 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |     87.90342171962 |  0.6392049453784305 |   0.988424424914435 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  4.683013253665058 |  0.9524155201748359 |  0.5358882850214233 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  52.45373021236392 | 0.16908935729553864 |  0.5977389933638982 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet | 63.153644129279854 | 0.08661048702300178 |  0.3591754879402138 
 (10 rows)
 ```
 
@@ -158,44 +170,44 @@ updatedData.withColumn("commit_num", lit("update2")).write.format("hudi").
 Now if we query the tables in the Presto CLI, we see that the MoR `RO` ("read-optimized") and `RT` ("real-time") tables are starting to look different. As you can guess by the names, the RT table has the freshest data, and the RO table still shows our previous state.
 
 ```sh
-presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips_table_ro;
- commit_num |        fare        |      begin_lon      |      begin_lat      |      ts       
-------------+--------------------+---------------------+---------------------+---------------
- update1    |  93.56018115236618 | 0.14285051259466197 | 0.21624150367601136 | 1753612150659 
- update1    |  27.79478688582596 |  0.6273212202489661 | 0.11488393157088261 | 1753220168185 
- update1    |  66.62084366450246 | 0.03844104444445928 |  0.0750588760043035 | 1753592423892 
- update1    | 34.158284716382845 | 0.46157858450465483 |  0.4726905879569653 | 1753164447671 
- update1    |  64.27696295884016 |  0.4923479652912024 |  0.5731835407930634 | 1753509890278 
- update1    |  41.06290929046368 |  0.8192868687714224 |   0.651058505660742 | 1753209120536 
- update1    | 17.851135255091155 |  0.5644092139040959 |    0.40613510977307 | 1753058046638 
- update1    |  33.92216483948643 |  0.9694586417848392 |  0.1856488085068272 | 1753301302307 
- update1    | 19.179139106643607 |  0.7528268153249502 |  0.8742041526408587 | 1753125594865 
- update1    |   43.4923811219014 |  0.8779402295427752 |  0.6100070562136587 | 1753163044342 
+presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_rt order by _hoodie_commit_time;
+ _hoodie_commit_time | commit_num |                             _hoodie_file_name                              |        fare        |      begin_lon      |      begin_lat      
+---------------------+------------+----------------------------------------------------------------------------+--------------------+---------------------+---------------------
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  92.66658188648728 | 0.19250097971954727 | 0.29883236260196766 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |     77.87647707179 | 0.48628479602261987 |  0.5108935227213224 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  87.60866855274442 |  0.7072482413115851 |  0.4050368427403227 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  2.542602090419077 | 0.32513116973946665 |  0.5223409231279434 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |     87.90342171962 |  0.6392049453784305 |   0.988424424914435 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  52.45373021236392 | 0.16908935729553864 |  0.5977389933638982 
+ 20250729021301565   | update2    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0                                     |   99.1562254763212 |  0.6294358584439047 |  0.8543808877516004 
+ 20250729021301565   | update2    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0                                     |  97.86876579077843 |   0.895279012685712 |  0.2650495107524782 
+ 20250729021301565   | update2    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0                                     | 15.893431524875934 | 0.22687250146427174 | 0.01766360374572995 
+ 20250729021301565   | update2    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0                                     |  11.38881031161545 |  0.8233625060614379 |   0.912094209732618 
 (10 rows)
 
-Query 20250727_223116_00003_h4y8p, FINISHED, 1 node
-Splits: 17 total, 17 done (100.00%)
-[Latency: client-side: 341ms, server-side: 317ms] [10 rows, 426KB] [31 rows/s, 1.31MB/s]
-
-presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips_table_rt;
- commit_num |        fare        |      begin_lon       |      begin_lat      |      ts       
-------------+--------------------+----------------------+---------------------+---------------
- update1    |  93.56018115236618 |  0.14285051259466197 | 0.21624150367601136 | 1753612150659 
- update2    |   98.3428192817987 |   0.3349917833248327 |  0.4777395067707303 | 1753070771758 
- update2    |  63.72504913279929 |    0.888493603696927 |  0.6570857443423376 | 1753304138915 
- update2    |  29.47661370147079 | 0.010872312870502165 |  0.1593867607188556 | 1753577100603 
- update2    | 49.527694252432056 |   0.5142184937933181 |  0.7340133901254792 | 1753517338281 
- update2    |  9.384124531808036 |   0.6999655248704163 | 0.16603428449020086 | 1753523629384 
- update2    |  90.25710109008239 |   0.4006983139989222 | 0.08528650347654165 | 1753458728013 
- update2    |   90.9053809533154 |  0.19949323322922063 | 0.18294079059016366 | 1753653631225 
- update1    | 19.179139106643607 |   0.7528268153249502 |  0.8742041526408587 | 1753125594865 
- update1    |   43.4923811219014 |   0.8779402295427752 |  0.6100070562136587 | 1753163044342 
+presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_ro order by _hoodie_commit_time;
+ _hoodie_commit_time | commit_num |                             _hoodie_file_name                              |        fare        |      begin_lon      |      begin_lat      
+---------------------+------------+----------------------------------------------------------------------------+--------------------+---------------------+---------------------
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  4.683013253665058 |  0.9524155201748359 |  0.5358882850214233 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  60.34776367964548 | 0.04838041157380535 |  0.8043080489965999 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  92.66658188648728 | 0.19250097971954727 | 0.29883236260196766 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  2.542602090419077 | 0.32513116973946665 |  0.5223409231279434 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |     87.90342171962 |  0.6392049453784305 |   0.988424424914435 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  52.45373021236392 | 0.16908935729553864 |  0.5977389933638982 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet | 63.153644129279854 | 0.08661048702300178 |  0.3591754879402138 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |     77.87647707179 | 0.48628479602261987 |  0.5108935227213224 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  87.60866855274442 |  0.7072482413115851 |  0.4050368427403227 
+ 20250729021205937   | update1    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-256-264_20250729021205937.parquet |  64.50549995709942 |   0.644801818366808 | 0.27416484281668874 
 (10 rows)
 ```
 
 We can also look in the Minio UI again to see the different files that have been created. Notice in the `.hoodie` path that we have two sets of `deltacommit` files
 
 ![MoR table update](../images/mor_dirs2.png)
+
+We can also see, from the main `mor_trips_table` path, that we have log files. This is where Hudi stores the data that has been inserted since our table was created.
+
+![MoR log files](../images/mor_log.png)
 
 Let's add data in the `spark-shell` one more time, this time specifying that we want to compact the MoR table after the second commit. This means that both the changes made in this operation and in the previous "insert" operation will be made "final".
 
@@ -215,38 +227,34 @@ moreUpdatedData.withColumn("commit_num", lit("update3")).write.format("hudi").
 Now when we query both tables in the Presto CLI, we see that the RO and RT MoR tables are once again in line.
 
 ```sh
-presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips_table_ro;
- commit_num |        fare        |      begin_lon      |      begin_lat      |      ts       
-------------+--------------------+---------------------+---------------------+---------------
- update3    | 26.636532270940915 | 0.12314538318119372 | 0.35527775182006427 | 1753628123984 
- update3    |  78.85334532337876 | 0.06330332057511467 | 0.16098476392187366 | 1753568217921 
- update3    |  58.09499619051147 | 0.49899171213436844 |  0.9692506010574379 | 1753614222174 
- update2    |   90.9053809533154 | 0.19949323322922063 | 0.18294079059016366 | 1753653631225 
- update3    | 53.682142277927525 |  0.9635314017496284 | 0.16258177392270334 | 1753560939974 
- update3    |  86.98901645001811 |  0.2853709038726113 |  0.9180654821797201 | 1753598176693 
- update3    |  84.14360533180016 | 0.18969854255968877 | 0.30523673273999896 | 1753635483683 
- update3    | 44.596839246210095 | 0.38697902072535484 |  0.9045189017781902 | 1753620381238 
- update3    | 14.824941686410531 |  0.9596221628238303 |  0.9983185001324134 | 1753638430900 
- update3    |  71.08018349571618 |  0.8150991077375751 | 0.01925237918893319 | 1753655212524 
+presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_rt order by _hoodie_commit_time;
+ _hoodie_commit_time | commit_num |                             _hoodie_file_name                              |        fare        |      begin_lon       |      begin_lat      
+---------------------+------------+----------------------------------------------------------------------------+--------------------+----------------------+---------------------
+ 20250729021301565   | update2    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet | 15.893431524875934 |  0.22687250146427174 | 0.01766360374572995 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |  83.72026345530593 |   0.9215019802670729 |  0.3342282415053993 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |  70.75181768700271 |    0.729623028385541 |  0.7839574214459966 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |  9.768372582023833 |   0.4207368731538873 | 0.12793027848861438 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet | 16.883429270325678 |  0.06563367485824312 | 0.10377660872667782 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |   60.2809650191646 |   0.8928407027516947 | 0.35471878303496784 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |  30.06619331487149 |   0.2676792805368092 |  0.4255539475116672 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |  88.05938803140756 | 0.015739965020097335 |  0.9567504820036522 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |  60.56303585997367 |   0.2315469742599775 |  0.4746664494938815 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |   71.6883114598098 |   0.9559151875258244 |  0.6027024841832427 
 (10 rows)
 
-Query 20250727_223417_00005_h4y8p, FINISHED, 1 node
-Splits: 17 total, 17 done (100.00%)
-[Latency: client-side: 287ms, server-side: 269ms] [10 rows, 426KB] [37 rows/s, 1.55MB/s]
-
-presto:default> select commit_num, fare, begin_lon, begin_lat, ts from mor_trips_table_rt;
- commit_num |        fare        |      begin_lon      |      begin_lat      |      ts       
-------------+--------------------+---------------------+---------------------+---------------
- update3    | 26.636532270940915 | 0.12314538318119372 | 0.35527775182006427 | 1753628123984 
- update3    |  78.85334532337876 | 0.06330332057511467 | 0.16098476392187366 | 1753568217921 
- update3    |  58.09499619051147 | 0.49899171213436844 |  0.9692506010574379 | 1753614222174 
- update3    |  84.14360533180016 | 0.18969854255968877 | 0.30523673273999896 | 1753635483683 
- update3    | 44.596839246210095 | 0.38697902072535484 |  0.9045189017781902 | 1753620381238 
- update3    | 14.824941686410531 |  0.9596221628238303 |  0.9983185001324134 | 1753638430900 
- update3    |  71.08018349571618 |  0.8150991077375751 | 0.01925237918893319 | 1753655212524 
- update2    |   90.9053809533154 | 0.19949323322922063 | 0.18294079059016366 | 1753653631225 
- update3    | 53.682142277927525 |  0.9635314017496284 | 0.16258177392270334 | 1753560939974 
- update3    |  86.98901645001811 |  0.2853709038726113 |  0.9180654821797201 | 1753598176693 
+presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_ro order by _hoodie_commit_time;
+ _hoodie_commit_time | commit_num |                             _hoodie_file_name                              |        fare        |      begin_lon       |      begin_lat      
+---------------------+------------+----------------------------------------------------------------------------+--------------------+----------------------+---------------------
+ 20250729021301565   | update2    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet | 15.893431524875934 |  0.22687250146427174 | 0.01766360374572995 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |   71.6883114598098 |   0.9559151875258244 |  0.6027024841832427 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |  9.768372582023833 |   0.4207368731538873 | 0.12793027848861438 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |  30.06619331487149 |   0.2676792805368092 |  0.4255539475116672 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet | 16.883429270325678 |  0.06563367485824312 | 0.10377660872667782 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |  88.05938803140756 | 0.015739965020097335 |  0.9567504820036522 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |   60.2809650191646 |   0.8928407027516947 | 0.35471878303496784 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |  60.56303585997367 |   0.2315469742599775 |  0.4746664494938815 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |  83.72026345530593 |   0.9215019802670729 |  0.3342282415053993 
+ 20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |  70.75181768700271 |    0.729623028385541 |  0.7839574214459966 
 (10 rows)
 ```
 
@@ -312,6 +320,9 @@ presto:default> select _hoodie_commit_time, _hoodie_partition_path, _hoodie_file
 (10 rows)
 ```
 
-Notice that you can see the relevant Hudi metadata information for each row of the data. Note: this information is also available for the MoR tables, but we chose to omit it in the previous section for brevity.
+Notice that you can see the relevant Hudi metadata information for each row of the data.
+
+!!! note
+    Note: this information is also available for the MoR tables, but we chose to omit it in the previous section for brevity.
 
 From here, you can experiment with adding data to our partitioned CoW table and exploring how the queries and s3 storage files change. You can also explore more advanced queries of the Hudi metadata on the MoR tables.
