@@ -25,7 +25,7 @@ In this section we'll explore Hudi Merge-on-Read (MoR) tables. MoR tables store 
 docker exec -it spark /opt/spark/bin/spark-shell
 ```
 
-It may take a few moments to initialize before you see the `>scala` prompt, indicating that the shell is ready to accept commands. Enter "paste" mode by typing the following and pressing enter:
+It may take a few moments to initialize before you see the `scala>` prompt, indicating that the shell is ready to accept commands. Enter "paste" mode by typing the following and pressing enter:
 ```sh
 :paste
 ```
@@ -108,7 +108,7 @@ data.withColumn("commit_num", lit("update1")).write.format("hudi").
     save(s"$basePath/$morTableName");
 ```
 
-Before we go on to query these tables, let's take a look at what files and directories have been created for this table in our s3 storage. Go to MinIO UI (`localhost:9091`) and log in with the username and password that we defined in `docker-compose.yaml` (`minio`/`minio123`). Under the `hudi-tables` path, there should be a sub-path called `mor_trips_table`. Click into this path and explore the created files and directory structure, especially those in the `.hoodie` directory. This is where Hudi keeps metadata for the `mor_trips_table`. We can see that there is one set of `deltacommit` files created to keep track of the initial data we've inserted into the table.
+Before we go on to query these tables, let's take a look at what files and directories have been created for this table in our s3 storage. Go to MinIO UI [http://localhost:9091](http://localhost:9091) and log in with the username and password that we defined in `docker-compose.yaml` (`minio`/`minio123`). Under the `hudi-tables` path, there should be a sub-path called `mor_trips_table`. Click into this path and explore the created files and directory structure, especially those in the `.hoodie` directory. This is where Hudi keeps metadata for the `mor_trips_table`. We can see that there is one set of `deltacommit` files created to keep track of the initial data we've inserted into the table.
 
 ![MoR metadata directory](../images/mor_dirs.png)
 
@@ -140,7 +140,8 @@ presto:default> show tables;
 --------------------
  mor_trips_table_ro 
  mor_trips_table_rt 
-(2 rows)
+ trips_table        
+(3 rows)
 ```
 
 !!! note

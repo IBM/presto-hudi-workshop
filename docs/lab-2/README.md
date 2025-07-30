@@ -18,13 +18,13 @@ In this section we'll explore Hudi tables. Currently, it is not possible to crea
 docker exec -it spark /opt/spark/bin/spark-shell
 ```
 
-It may take a few moments to initialize before you see the `>scala` prompt, indicating that the shell is ready to accept commands. Enter "paste" mode by typing the following and pressing enter:
+It may take a few moments to initialize before you see the `scala>` prompt, indicating that the shell is ready to accept commands. Enter "paste" mode by typing the following and pressing enter:
 ```sh
 :paste
 ```
 For example:
 ```sh
->scala :paste
+scala> :paste
 
 // Entering paste mode (ctrl-D to finish)
 ```
@@ -97,7 +97,7 @@ data.withColumn("commit_num", lit("update1")).write.format("hudi").
     save(s"$basePath/$tableName");
 ```
 
-Before we go on to query these tables, let's take a look at what files and directories have been created for this table in our s3 storage. Go to MinIO UI (`localhost:9091`) and log in with the username and password that we defined in `docker-compose.yaml` (`minio`/`minio123`). Under the `hudi-tables` path, there should be a single sub-path called `trips_table`. Below is a look at the file structure.
+Before we go on to query these tables, let's take a look at what files and directories have been created for this table in our s3 storage. Go to MinIO UI [http://localhost:9091](http://localhost:9091) and log in with the username and password that we defined in `docker-compose.yaml` (`minio`/`minio123`). Under the `hudi-tables` path, there should be a single sub-path called `trips_table`. Below is a look at the file structure.
 
 ![table directory in s3](../images/table_dirs.png)
 
