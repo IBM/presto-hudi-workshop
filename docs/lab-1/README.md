@@ -173,7 +173,7 @@ If the Presto server is up and running properly, the last lines of the output wo
 
 The Presto server will likely take the longest to start up. If you don't see any errors or the `SERVER STARTED` notice, wait a few minutes and check the logs again.
 
-You can also assess the status of your cluster using the Presto UI at the relevant IP address: `http://<your_ip>:8080`. If you're running everything on your local machine, the address will be `http://localhost:8000`. You should see 1 active worker (which is the coordinator node, in our case) and a green "ready" status in the top right corner, as seen below.
+You can also assess the status of your cluster using the Presto UI at the relevant IP address: `http://<your_ip>:8080`. If you're running everything on your local machine, the address will be [http://localhost:8000](http://localhost:8000). You should see 1 active worker (which is the coordinator node, in our case) and a green "ready" status in the top right corner, as seen below.
 
 ![presto ui](../images/presto-ui.png)
 
