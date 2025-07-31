@@ -19,10 +19,13 @@ docker exec -it spark /opt/spark/bin/spark-shell
 ```
 
 It may take a few moments to initialize before you see the `scala>` prompt, indicating that the shell is ready to accept commands. Enter "paste" mode by typing the following and pressing enter:
+
 ```sh
 :paste
 ```
+
 For example:
+
 ```sh
 scala> :paste
 
@@ -118,16 +121,22 @@ We first specify that we want to use the Hudi catalog and `default` schema for a
 ```sql
 use hudi.default;
 ```
+
 For example:
+
 ```sh
 presto> use hudi.default;
 USE
 ```
+
 Next, list the available tables:
+
 ```sql
 show tables;
 ```
+
 For example:
+
 ```sh
 presto:default> show tables;
        Table        
@@ -137,23 +146,30 @@ presto:default> show tables;
 ```
 
 As expected, we see a single table here with the name of the table we created in the `spark-shell`. We can run a `select *` on this data.
+
 ```sql
 select * from trips_table limit 10;
 ```
+
 For example:
+
 ```sh
 presto:default> select * from trips_table limit 10;
 ```
+
 !!! note
     Note: Press "q" to exit out out after you see "(END)"
 
 The results (omitted here for space) show more than you may expect to see with a traditional table. The columns prefixed with `_hoodie` are metadata properties that Hudi uses to manage the table state. You can also see the original columns at far right of the table (`begin_lat`, `begin_lon`, `fare`, etc.).
 
 Let's execute a query that pares down these results slightly:
+
 ```sql
 select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from trips_table order by _hoodie_commit_time;
 ```
+
 For example:
+
 ```sh
 presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from trips_table order by _hoodie_commit_time;
  _hoodie_commit_time | commit_num |                             _hoodie_file_name                              |        fare        |      begin_lon       |      begin_lat       
@@ -189,10 +205,13 @@ updatedData.withColumn("commit_num", lit("update2")).write.format("hudi").
 ```
 
 Now if we query the tables in the Presto CLI, we see that there are multiple commit times, as shown by our first two columns in the below query. Make sure to hold `Return` in order to see all 100 rows of the updated table.
+
 ```sql
 select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from trips_table order by _hoodie_commit_time;
 ```
+
 For example:
+
 ```sh
 presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from trips_table order by _hoodie_commit_time;
  _hoodie_commit_time | commit_num |                             _hoodie_file_name                              |        fare        |      begin_lon       |      begin_lat       
