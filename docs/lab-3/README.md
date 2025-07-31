@@ -8,8 +8,9 @@ This section is comprised of the following steps:
   - [1. Create MoR Hudi table](#1-create-mor-hudi-table)
   - [2. Query MoR table with Presto](#2-query-mor-table-with-presto)
   - [3. Add data to MoR table and query](#3-add-data-to-mor-table-and-query)
-  - [4. Create CoW Hudi table](#4-create-cow-hudi-table)
+  - [4. Create partitioned CoW Hudi table](#4-create-partitioned-cow-hudi-table)
   - [5. Query CoW table with Presto](#5-query-cow-table-with-presto)
+    - [Optional shutdown](#optional-shutdown)
 
 If you previously stopped your lakehouse containers, restart them now with:
 
@@ -145,9 +146,9 @@ presto:default> show tables;
 ```
 
 !!! note
-    You may have an additional table if you completed lab 2 without shutting down or restarting your lakehouse cluster.
+    You may not have the `trips_table` depending on when you completed lab 2 and if you shut down or restarted your lakehouse cluster.
 
-Notice how Hudi has implicity created two versions of the MoR table - one suffixed with `_ro` for "read-optimized" and one suffixed with `_rt` for "real-time". As expected, each provides a different view. Right now, querying them shows the same information since we've only inserted data into the table once at time of creation. Run the below query on both tables to verify this.
+Notice how Hudi is implicity showing us two versions of the MoR table - one suffixed with `_ro` for "read-optimized" and one suffixed with `_rt` for "real-time". As expected, each provides a different view. Right now, querying them shows the same information since we've only inserted data into the table once at time of creation. Run the below query on both tables to verify this.
 ```sh
 select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_ro order by _hoodie_commit_time;
 ```
@@ -227,7 +228,7 @@ presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare,
 (10 rows)
 ```
 
-We can also look in the Minio UI again to see the different files that have been created. Notice in the `.hoodie` path that we have two sets of `deltacommit` files
+We can also look in the MinIO UI again to see the different files that have been created. Notice in the `.hoodie` path that we have two sets of `deltacommit` files
 
 ![MoR table update](../images/mor_dirs2.png)
 
@@ -293,13 +294,13 @@ presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare,
 (10 rows)
 ```
 
-In the Minio UI, we are able to see a third set of `deltacommit`s as well as the compaction commit.
+In the MinIO UI, we are able to see a third set of `deltacommit`s as well as the compaction commit.
 
 ![MoR compaction](../images/mor_dirs3.png)
 
-## 4. Create CoW Hudi table
+## 4. Create partitioned CoW Hudi table
 
-In this section we'll explore Hudi Copy-on-Write (CoW) tables. CoW tables store data using exclusively columnar file formats (e.g parquet). Updates version & rewrites the files by performing a synchronous merge during write. Let's create a COW table with partitions in Spark so that we can also see how partitioning changes the directory structure of our tables. From within the `spark-shell` session from the previous sections, enter the following code in paste mode:
+In this section we'll explore Hudi partitioned Copy-on-Write (CoW) tables. CoW tables store data using exclusively columnar file formats (e.g parquet). Updates version & rewrites the files by performing a synchronous merge during write. Let's create a COW table with partitions in Spark so that we can also see how partitioning changes the directory structure of our tables. From within the `spark-shell` session from the previous sections, enter the following code in paste mode:
 
 ```
 val cowTableName = "cow_trips_table"
@@ -336,8 +337,12 @@ presto:default> show tables;
  cow_trips_table    
  mor_trips_table_ro 
  mor_trips_table_rt 
-(3 rows)
+ trips_table        
+(4 rows)
 ```
+
+!!! note
+    You may not have the `trips_table` depending on when you completed lab 2 and if you shut down or restarted your lakehouse cluster.
 
 We can then run a `select` statement:
 ```sh
@@ -372,9 +377,9 @@ From here, you can experiment with adding data to our partitioned CoW table and 
 
 When you're all done with the labs, to clean up your environment you can do these steps:
 
-In the spark-shell terminal, to exit the scala prompt, you enter `ctrl-c`
+In the `spark-shell` terminal, to exit the scala prompt, you enter `ctrl-c`
 
-In the presto-cli terminal, to exit the presto prompt, you enter `ctrl-d`
+In the `presto-cli` terminal, to exit the presto prompt, you enter `ctrl-d`
 
 Then, to stop all your running Docker/Podman containers, you issue:
 

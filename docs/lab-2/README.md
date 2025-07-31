@@ -175,7 +175,7 @@ presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare,
 Now, let's go back to our `spark-shell` terminal tab and add more data to our tables using paste mode. Note that our `commit_num` column value has changed.
 
 !!! note
-    Note: If you exit your spark-shell and have to issue another "docker exec -it spark /opt/spark/bin/spark-shell" to restart it, you need to get into paste mode and reimport all the required packages again as you did above in step 1.
+    Note: If you exit your spark-shell and have to issue another `docker exec -it spark /opt/spark/bin/spark-shell` to restart it, you need to get into paste mode and reimport all the required packages again as you did above in step 1.
 
 ```
 val updates = convertToStringList(dataGen.generateUpdates(50))
@@ -197,16 +197,13 @@ For example:
 presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from trips_table order by _hoodie_commit_time;
  _hoodie_commit_time | commit_num |                             _hoodie_file_name                              |        fare        |      begin_lon       |      begin_lat       
 ---------------------+------------+----------------------------------------------------------------------------+--------------------+----------------------+----------------------
- 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet | 25.200733895704396 |   0.9805032518130713 |   0.3250925842689032 
- 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet |  80.22532741048674 |  0.23558979258614088 |   0.9106955060439053 
- 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet |  84.00133794186554 |   0.7041966710545763 |   0.3988839560181455 
- 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet | 27.793208764156986 |   0.9676738239915396 |   0.5075033998567434 
- 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet |  61.44682955106423 |  0.13477337728703764 | 0.025339371609693573 
- 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet |  90.97255481383131 |   0.7196037664723752 |   0.9539455886006297 
- 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet |  51.61325440476856 |  0.36749492639453507 |   0.7666637026082733 
- 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet | 49.732991851283806 |    0.154807828660673 |   0.2276038992283157 
- 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet |  61.94955367333943 |   0.8474997543537904 |   0.6616963793198591 
- 20250729020557937   | update1    | df001f68-16bc-4289-b8f5-755e27aa9cd9-0_0-227-237_20250729020731412.parquet | 13.166804203104244 |   0.8977861433951416 |  0.12749772853900576 
+ 20250729020557937   | update1    | dd513af1-2291-4fea-a588-06e7c55fec23-0_0-50-53_20250729230015275.parquet | 25.200733895704396 |   0.9805032518130713 |   0.3250925842689032 
+ 20250729020557937   | update1    | dd513af1-2291-4fea-a588-06e7c55fec23-0_0-50-53_20250729230015275.parquet |  80.22532741048674 |  0.23558979258614088 |   0.9106955060439053 
+ 20250729020557937   | update1    | dd513af1-2291-4fea-a588-06e7c55fec23-0_0-50-53_20250729230015275.parquet |  84.00133794186554 |   0.7041966710545763 |   0.3988839560181455 
+ 20250729020557937   | update1    | dd513af1-2291-4fea-a588-06e7c55fec23-0_0-50-53_20250729230015275.parquet | 27.793208764156986 |   0.9676738239915396 |   0.5075033998567434 
+ 20250729020557937   | update1    | dd513af1-2291-4fea-a588-06e7c55fec23-0_0-50-53_20250729230015275.parquet |  61.44682955106423 |  0.13477337728703764 | 0.025339371609693573 
+ 20250729020557937   | update1    | dd513af1-2291-4fea-a588-06e7c55fec23-0_0-50-53_20250729230015275.parquet |  90.97255481383131 |   0.7196037664723752 |   0.9539455886006297 
+ 20250729020557937   | update1    | dd513af1-2291-4fea-a588-06e7c55fec23-0_0-50-53_20250729230015275.parquet |  51.61325440476856 |  0.36749492639453507 |   0.7666637026082733 
 
  (additional rows omitted here...)
  20250729230015275   | update2    | dd513af1-2291-4fea-a588-06e7c55fec23-0_0-50-53_20250729230015275.parquet |   48.68719058185585 |   0.4795784679677898 |  0.25038172085518196 
@@ -219,11 +216,11 @@ presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare,
 
 ```
 
-We can see that the values in the `_hoodie_file_name` have changed for the entries from the first commit. This is to be expected, as we created a "Copy on Write" table. We can also look in the Minio UI again to see the different files that have been created. Notice that there is a new data file that holds only the data added in the most recent commit.
+We can see that the values in the `_hoodie_file_name` have changed for the entries from the first commit. This is to be expected, as we created a "Copy on Write" table (the default table type in Hudi). We can also look in the MinIO UI again to see the different files that have been created. Notice that there is a new data file that holds the data added in the most recent commit as well as the previous commit's data as well.
 
 ![updated table data files](../images/table_dirs2.png)
 
-At this point, feel free to continue executing queries and adding data as desired to get familiar with Hudi functionality. You may also move on to lab 3.
+In the `.hoodie` directory, we can also see additional commit files that have been added since the last time we checked. At this point, feel free to continue executing queries and adding data as desired to get familiar with Hudi functionality. You may also move on to lab 3.
 
 ### Optional shutdown
 
@@ -233,4 +230,4 @@ If you do not intend to go on to lab 3 right now, you can shut down your lakehou
 docker compose down -v
 ```
 
-This command will stop all containers and remove the volumes. You can omit the -v command if you want to keep your existing data for the `trips_table` in your Minio storage and come back to complete lab 3 later.
+This command will stop all containers and remove the volumes. You can omit the `-v` parameter if you want to keep your existing data for the `trips_table` in your MinIO storage and come back to complete lab 3 later.
