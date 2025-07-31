@@ -31,7 +31,7 @@ It may take a few moments to initialize before you see the `scala>` prompt, indi
 ```
 For example:
 ```sh
->scala :paste
+scala> :paste
 
 // Entering paste mode (ctrl-D to finish)
 ```
@@ -121,7 +121,7 @@ Now let's query these tables with Presto. In a new terminal tab or window, exec 
 ```
 
 We first specify that we want to use the Hudi catalog and `default` schema for all queries here on out. Then, execute a `show tables` command:
-```sh
+```sql
 use hudi.default;
 ```
 For example:
@@ -130,7 +130,7 @@ presto> use hudi.default;
 USE
 ```
 Next, list the available tables:
-```sh
+```sql
 show tables;
 ```
 For example:
@@ -148,7 +148,7 @@ presto:default> show tables;
     You may have an additional table if you completed lab 2 without shutting down or restarting your lakehouse cluster.
 
 Notice how Hudi has implicity created two versions of the MoR table - one suffixed with `_ro` for "read-optimized" and one suffixed with `_rt` for "real-time". As expected, each provides a different view. Right now, querying them shows the same information since we've only inserted data into the table once at time of creation. Run the below query on both tables to verify this.
-```sh
+```sql
 select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_ro order by _hoodie_commit_time;
 ```
 For example:
@@ -173,7 +173,7 @@ presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare,
 
 Now, let's go back to our `spark-shell` terminal tab and add more data to our tables using paste mode. Note that our `commit_num` column value has changed.
 
-```
+```scala
 val updates = convertToStringList(dataGen.generateUpdates(10))
 val updatedData = spark.read.json(spark.sparkContext.parallelize(updates, 2));
 
@@ -185,7 +185,7 @@ updatedData.withColumn("commit_num", lit("update2")).write.format("hudi").
 ```
 
 Now if we query the tables in the Presto CLI, we see that the MoR `RO` ("read-optimized") and `RT` ("real-time") tables are starting to look different. As you can guess by the names, the RT table has the freshest data, and the RO table still shows our previous state.
-```sh
+```sql
 select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_rt order by _hoodie_commit_time;
 ```
 For example:
@@ -206,7 +206,7 @@ presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare,
 (10 rows)
 ```
 And
-```sh
+```sql
 select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_ro order by _hoodie_commit_time;
 ```
 For example:
@@ -237,7 +237,7 @@ We can also see, from the main `mor_trips_table` path, that we have log files. T
 
 Let's add data in the `spark-shell` one more time, this time specifying that we want to compact the MoR table after the second commit. This means that both the changes made in this operation and in the previous "insert" operation will be made "final".
 
-```
+```scala
 val moreUpdates = convertToStringList(dataGen.generateUpdates(100))
 val moreUpdatedData = spark.read.json(spark.sparkContext.parallelize(moreUpdates, 2));
 
@@ -251,7 +251,7 @@ moreUpdatedData.withColumn("commit_num", lit("update3")).write.format("hudi").
 ```
 
 Now when we query both tables in the Presto CLI, we see that the RO and RT MoR tables are once again in line.
-```sh
+```sql
 select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_ro order by _hoodie_commit_time;
 ```
 For example:
@@ -272,7 +272,7 @@ presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare,
 (10 rows)
 ```
 And
-```sh
+```sql
 select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_ro order by _hoodie_commit_time;
 ```
 For example:
@@ -301,7 +301,7 @@ In the Minio UI, we are able to see a third set of `deltacommit`s as well as the
 
 In this section we'll explore Hudi Copy-on-Write (CoW) tables. CoW tables store data using exclusively columnar file formats (e.g parquet). Updates version & rewrites the files by performing a synchronous merge during write. Let's create a COW table with partitions in Spark so that we can also see how partitioning changes the directory structure of our tables. From within the `spark-shell` session from the previous sections, enter the following code in paste mode:
 
-```
+```scala
 val cowTableName = "cow_trips_table"
 
 val countries = Seq("US", "IN", "DE")
@@ -325,7 +325,7 @@ Additionally, in the `.hoodie` directory, we can see that there is a single set 
 ## 5. Query CoW table with Presto
 
 From our Presto CLI tab, we can query the new table. First verify that it has synced to the Hive metastore by running a `show tables` command:
-```sh
+```sql
 show tables;
 ```
 For example:
@@ -336,11 +336,12 @@ presto:default> show tables;
  cow_trips_table    
  mor_trips_table_ro 
  mor_trips_table_rt 
-(3 rows)
+ trips_table        
+(4 rows)
 ```
 
 We can then run a `select` statement:
-```sh
+```sql
 select _hoodie_commit_time, _hoodie_partition_path, _hoodie_file_name, uuid, name, age, country from cow_trips_table limit 10;
 ```
 For example:
@@ -368,7 +369,7 @@ Notice that you can see the relevant Hudi metadata information for each row of t
 
 From here, you can experiment with adding data to our partitioned CoW table and exploring how the queries and s3 storage files change. You can also explore more advanced queries of the Hudi metadata on the MoR tables.
 
-### Optional shutdown
+### Shutdown
 
 When you're all done with the labs, to clean up your environment you can do these steps:
 
