@@ -10,7 +10,7 @@ This section is comprised of the following steps:
   - [3. Add data to MoR table and query](#3-add-data-to-mor-table-and-query)
   - [4. Create partitioned CoW Hudi table](#4-create-partitioned-cow-hudi-table)
   - [5. Query CoW table with Presto](#5-query-cow-table-with-presto)
-    - [Optional shutdown](#optional-shutdown)
+    - [Shutdown](#shutdown)
 
 If you previously stopped your lakehouse containers, restart them now with:
 
@@ -27,10 +27,13 @@ docker exec -it spark /opt/spark/bin/spark-shell
 ```
 
 It may take a few moments to initialize before you see the `scala>` prompt, indicating that the shell is ready to accept commands. Enter "paste" mode by typing the following and pressing enter:
+
 ```sh
 :paste
 ```
+
 For example:
+
 ```sh
 scala> :paste
 
@@ -122,19 +125,26 @@ Now let's query these tables with Presto. In a new terminal tab or window, exec 
 ```
 
 We first specify that we want to use the Hudi catalog and `default` schema for all queries here on out. Then, execute a `show tables` command:
+
 ```sql
 use hudi.default;
 ```
+
 For example:
+
 ```sh
 presto> use hudi.default;
 USE
 ```
+
 Next, list the available tables:
+
 ```sql
 show tables;
 ```
+
 For example:
+
 ```sh
 presto:default> show tables;
        Table        
@@ -149,10 +159,13 @@ presto:default> show tables;
     You may not have the `trips_table` depending on when you completed lab 2 and if you shut down or restarted your lakehouse cluster.
 
 Notice how Hudi is implicity showing us two versions of the MoR table - one suffixed with `_ro` for "read-optimized" and one suffixed with `_rt` for "real-time". As expected, each provides a different view. Right now, querying them shows the same information since we've only inserted data into the table once at time of creation. Run the below query on both tables to verify this.
+
 ```sql
 select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_ro order by _hoodie_commit_time;
 ```
+
 For example:
+
 ```sh
 presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_ro order by _hoodie_commit_time;
  _hoodie_commit_time | commit_num |                             _hoodie_file_name                              |        fare        |      begin_lon      |      begin_lat      
@@ -186,10 +199,13 @@ updatedData.withColumn("commit_num", lit("update2")).write.format("hudi").
 ```
 
 Now if we query the tables in the Presto CLI, we see that the MoR `RO` ("read-optimized") and `RT` ("real-time") tables are starting to look different. As you can guess by the names, the RT table has the freshest data, and the RO table still shows our previous state.
+
 ```sql
 select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_rt order by _hoodie_commit_time;
 ```
+
 For example:
+
 ```sh
 presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_rt order by _hoodie_commit_time;
  _hoodie_commit_time | commit_num |                             _hoodie_file_name                              |        fare        |      begin_lon      |      begin_lat      
@@ -206,11 +222,15 @@ presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare,
  20250729021301565   | update2    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0                                     |  11.38881031161545 |  0.8233625060614379 |   0.912094209732618 
 (10 rows)
 ```
+
 And
+
 ```sql
 select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_ro order by _hoodie_commit_time;
 ```
+
 For example:
+
 ```sh
 presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_ro order by _hoodie_commit_time;
  _hoodie_commit_time | commit_num |                             _hoodie_file_name                              |        fare        |      begin_lon      |      begin_lat      
@@ -252,10 +272,13 @@ moreUpdatedData.withColumn("commit_num", lit("update3")).write.format("hudi").
 ```
 
 Now when we query both tables in the Presto CLI, we see that the RO and RT MoR tables are once again in line.
+
 ```sql
 select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_ro order by _hoodie_commit_time;
 ```
+
 For example:
+
 ```sh
 presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_rt order by _hoodie_commit_time;
  _hoodie_commit_time | commit_num |                             _hoodie_file_name                              |        fare        |      begin_lon       |      begin_lat      
@@ -272,11 +295,15 @@ presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare,
  20250729021427840   | update3    | f226d78a-a109-4b0a-b9a6-e522b75c1037-0_0-324-330_20250729021428973.parquet |   71.6883114598098 |   0.9559151875258244 |  0.6027024841832427 
 (10 rows)
 ```
+
 And
+
 ```sql
 select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_ro order by _hoodie_commit_time;
 ```
+
 For example:
+
 ```sh
 presto:default> select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_ro order by _hoodie_commit_time;
  _hoodie_commit_time | commit_num |                             _hoodie_file_name                              |        fare        |      begin_lon       |      begin_lat      
@@ -326,10 +353,13 @@ Additionally, in the `.hoodie` directory, we can see that there is a single set 
 ## 5. Query CoW table with Presto
 
 From our Presto CLI tab, we can query the new table. First verify that it has synced to the Hive metastore by running a `show tables` command:
+
 ```sql
 show tables;
 ```
+
 For example:
+
 ```sh
 presto:default> show tables;
        Table        
@@ -345,10 +375,13 @@ presto:default> show tables;
     You may not have the `trips_table` depending on when you completed lab 2 and if you shut down or restarted your lakehouse cluster.
 
 We can then run a `select` statement:
+
 ```sql
 select _hoodie_commit_time, _hoodie_partition_path, _hoodie_file_name, uuid, name, age, country from cow_trips_table limit 10;
 ```
+
 For example:
+
 ```sh
 presto:default> select _hoodie_commit_time, _hoodie_partition_path, _hoodie_file_name, uuid, name, age, country from cow_trips_table limit 10;
  _hoodie_commit_time | _hoodie_partition_path |                             _hoodie_file_name                              |                 uuid                 |   name   | age | country 
@@ -386,6 +419,7 @@ Then, to stop all your running Docker/Podman containers, you issue:
 ```sh
 docker compose down -v
 ```
+
 !!! note
     Note: you need to be in the src or the src/conf folders while issuing the docker compose
 

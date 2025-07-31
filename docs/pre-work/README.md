@@ -29,6 +29,6 @@ Alternatively, you can download the zipped jar files [directly from the latest r
 
 ## Optional: Join the Presto community
 
-If you are working on this lab and run into issues, you can reach out on the [Presto Slack](https://communityinviter.com/apps/prestodb/prestodb) `#community` channel. We'll do our best to help troubleshoot with you there! Even if you don't need any help with this workshop, we encourage you to join. Slack is the best place to meet other Presto engineers and users.
+If you are working on this lab and run into issues, you can reach out on the [Presto Slack](https://communityinviter.com/apps/prestodb/prestodb) `#presto-hudi-connector` channel. We'll do our best to help troubleshoot with you there! Even if you don't need any help with this workshop, we encourage you to join. Slack is the best place to meet other Presto engineers and users.
 
 If you're interested in contributing code or documentation to Presto, we'd love to have you! Start at the [Presto GitHub repo](https://github.com/prestodb/presto).
