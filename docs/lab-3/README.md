@@ -274,7 +274,7 @@ moreUpdatedData.withColumn("commit_num", lit("update3")).write.format("hudi").
 Now when we query both tables in the Presto CLI, we see that the RO and RT MoR tables are once again in line.
 
 ```sql
-select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_ro order by _hoodie_commit_time;
+select _hoodie_commit_time, commit_num, _hoodie_file_name, fare, begin_lon, begin_lat from mor_trips_table_rt order by _hoodie_commit_time;
 ```
 
 For example:
