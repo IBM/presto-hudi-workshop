@@ -11,6 +11,9 @@ services:
     volumes:
       - ./etc:/opt/presto-server/etc
     environment:
+      # Local-only workshop object-store credentials for the disposable demo stack.
+      # These are sample values for the participant's local docker-compose environment only
+      # and do not provide access to IBM cloud, production, or shared services.
       AWS_ACCESS_KEY_ID: minio
       AWS_SECRET_ACCESS_KEY: minio123
     depends_on:
@@ -27,6 +30,9 @@ services:
     volumes:
       - mysql-data:/var/lib/mysql
     environment:
+      # Local-only workshop credentials for the disposable demo MySQL container.
+      # These values grant access only within the participant's local docker-compose environment
+      # and are not IBM production, cloud, or shared-service credentials.
       MYSQL_ROOT_PASSWORD: admin
       MYSQL_USER: admin
       MYSQL_PASSWORD: admin
@@ -61,6 +67,8 @@ services:
     volumes:
       - minio-data:/data
     environment:
+      # Local-only workshop credentials for the disposable demo MinIO container.
+      # These values are intended solely for the participant's local lab environment.
       MINIO_ACCESS_KEY: minio
       MINIO_SECRET_KEY: minio123
       MINIO_DOMAIN: minio
@@ -113,6 +121,9 @@ services:
       - ./conf/jars/httpclient-4.5.13.jar:/opt/spark/jars/httpclient-4.5.13.jar
       - ./conf/jars/hudi-spark3.2-bundle_2.12-0.14.0.jar:/opt/spark/jars/hudi-spark3.2-bundle_2.12-0.14.0.jar
     environment:
+      # Local-only workshop object-store credentials for the disposable demo stack.
+      # These are sample values for the participant's local docker-compose environment only
+      # and do not provide access to IBM cloud, production, or shared services.
       AWS_ACCESS_KEY_ID: minio
       AWS_SECRET_KEY: minio123
       HUDI_CONF_DIR: /etc/hudi/conf
